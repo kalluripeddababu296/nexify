@@ -10,4 +10,4 @@
 //   const API_BASE = "http://localhost:5000";
 // Leave it as "" to run the storefront in offline/demo mode (admin login
 // requires a real backend, so set this before using admin.html).
-const API_BASE = "http://localhost:5000";
+const API_BASE = "https://nexify-backend-rh69.onrender.com";
