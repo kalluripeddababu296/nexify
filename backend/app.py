@@ -413,29 +413,45 @@ def submit_review():
 
 
 def send_email(subject, body_text, to_email):
-    """Shared SMTP sender."""
+    """Shared email sender — uses the Resend HTTP API (https://resend.com).
 
-    smtp_host = os.environ.get("SMTP_HOST")
-    if not smtp_host:
-        return False, "email isn't configured on the server yet"
+    Render blocks outbound SMTP connections (port 587/465) at the network
+    level on web services, so a normal smtplib.SMTP() call to Gmail just
+    hangs and eventually errors with 'network is unreachable'. Sending over
+    HTTPS via an email API sidesteps that entirely.
 
-    import smtplib
-    from email.mime.text import MIMEText
+    Setup (one-time, ~2 minutes):
+      1. Sign up free at https://resend.com
+      2. Dashboard -> API Keys -> Create API Key -> copy it
+      3. Add RESEND_API_KEY=<that key> in Render -> Environment
+      4. Without verifying a domain, Resend only delivers to the email
+         address you signed up with — which is fine here since that's
+         CUSTOMER_CARE_EMAIL / ADMIN_EMAIL anyway. To send to other
+         addresses later, verify a domain in Resend and change
+         RESEND_FROM below to an address on that domain.
+    """
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return False, "email isn't configured on the server yet (missing RESEND_API_KEY)"
 
-    msg = MIMEText(body_text)
-    msg["Subject"] = subject
-    msg["From"] = os.environ.get("SMTP_FROM", "noreply@nexify.app")
-    msg["To"] = to_email
+    import requests
+
+    from_address = os.environ.get("RESEND_FROM", "Nexify <onboarding@resend.dev>")
 
     try:
-        with smtplib.SMTP(smtp_host, int(os.environ.get("SMTP_PORT", 587)), timeout=10) as server:
-            server.starttls()
-            server.login(
-                os.environ.get("SMTP_USER", ""),
-                os.environ.get("SMTP_PASS", "")
-            )
-            server.send_message(msg)
-
+        res = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "from": from_address,
+                "to": [to_email],
+                "subject": subject,
+                "text": body_text,
+            },
+            timeout=10,
+        )
+        if res.status_code >= 300:
+            return False, f"Resend error ({res.status_code}): {res.text}"
         return True, None
 
     except Exception as e:
