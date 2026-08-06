@@ -413,12 +413,12 @@ def submit_review():
 
 
 def send_email(subject, body_text, to_email):
-    """Shared SMTP sender used by both the new-order alert and Customer Care
-    messages. Returns (ok, error_message). Skips silently (ok=False, a
-    friendly reason) if SMTP_HOST isn't configured yet."""
+    """Shared SMTP sender."""
+
     smtp_host = os.environ.get("SMTP_HOST")
     if not smtp_host:
-        return False, "email isn't configured on the server yet (SMTP_HOST missing in .env)"
+        return False, "email isn't configured on the server yet"
+
     import smtplib
     from email.mime.text import MIMEText
 
@@ -427,35 +427,19 @@ def send_email(subject, body_text, to_email):
     msg["From"] = os.environ.get("SMTP_FROM", "noreply@nexify.app")
     msg["To"] = to_email
 
-   try:
-    print("Connecting to SMTP...")
+    try:
+        with smtplib.SMTP(smtp_host, int(os.environ.get("SMTP_PORT", 587))) as server:
+            server.starttls()
+            server.login(
+                os.environ.get("SMTP_USER", ""),
+                os.environ.get("SMTP_PASS", "")
+            )
+            server.send_message(msg)
 
-    with smtplib.SMTP(
-        smtp_host,
-        int(os.environ.get("SMTP_PORT", 587)),
-        timeout=10
-    ) as server:
+        return True, None
 
-        print("Connected")
-        server.starttls()
-
-        print("TLS OK")
-        server.login(
-            os.environ.get("SMTP_USER", ""),
-            os.environ.get("SMTP_PASS", "")
-        )
-
-        print("Login OK")
-        server.send_message(msg)
-
-        print("Mail Sent")
-
-    return True, None
-
-except Exception as e:
-    import traceback
-    traceback.print_exc()
-    return False, str(e)
+    except Exception as e:
+        return False, str(e))
 
 
 def notify_admin_new_order(row):
