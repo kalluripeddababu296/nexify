@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexify Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B1B1F; --ink-soft:#5B5B66; --cream:#FFF8F1; --panel:#fff; --line:#EFE6DA;
+    --brand:#FF6A1A; --brand-dark:#E14E00; --brand-tint:#FFE9DA;
+    --ok:#1E8E5A; --ok-tint:#E5F5EC; --danger:#D8402C; --danger-tint:#FDECEA; --gold:#F2A93C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ font-family:'Inter',sans-serif; background:var(--cream); color:var(--ink); }
+  h1,h2,h3{ font-family:'Space Grotesk',sans-serif; }
+  button{ font-family:inherit; cursor:pointer; border:none; }
+  input, select{ font-family:inherit; }
+
+  /* ---------- Login screen ---------- */
+  #login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .login-card{
+    background:#fff; border:1px solid var(--line); border-radius:20px; padding:38px 34px; width:100%; max-width:380px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.06);
+  }
+  .login-card .logo{ font-size:24px; font-weight:700; margin-bottom:4px; }
+  .login-card .logo span{ color:var(--brand); }
+  .login-card .sub{ font-size:13px; color:var(--ink-soft); margin-bottom:26px; }
+  .field{ margin-bottom:16px; }
+  .field label{ font-size:12.5px; font-weight:700; display:block; margin-bottom:6px; }
+  .field input{
+    width:100%; border:1px solid var(--line); background:var(--cream); border-radius:9px; padding:11px 13px;
+    font-size:13.5px; outline:none;
+  }
+  .field input:focus{ border-color:var(--brand); background:#fff; }
+  .login-card button{
+    width:100%; background:var(--brand); color:#fff; padding:13px; border-radius:10px; font-weight:700; font-size:14px; margin-top:6px;
+  }
+  .login-error{ color:var(--danger); font-size:12.5px; margin-top:10px; text-align:center; display:none; }
+
+  /* ---------- Dashboard shell ---------- */
+  #dashboard{ display:none; min-height:100vh; }
+  #dashboard.show{ display:flex; }
+  .sidebar{
+    width:220px; background:var(--ink); color:#fff; flex-shrink:0; padding:22px 16px; display:flex; flex-direction:column;
+  }
+  .sidebar .logo{ font-size:20px; font-weight:700; margin-bottom:2px; }
+  .sidebar .logo span{ color:var(--brand); }
+  .sidebar .tag{ font-size:11px; color:#9A9AA5; margin-bottom:26px; }
+  .nav-item{
+    padding:11px 12px; border-radius:9px; font-size:13.5px; font-weight:600; color:#C7C7D0; margin-bottom:4px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .nav-item.active, .nav-item:hover{ background:#2A2A31; color:#fff; }
+  .sidebar .logout{ margin-top:auto; color:#9A9AA5; font-size:12.5px; padding:11px 12px; }
+
+  .content{ flex:1; padding:28px 34px; overflow-y:auto; max-height:100vh; }
+  .content-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; }
+  .content-head h2{ font-size:21px; }
+  .pill{ background:var(--brand-tint); color:var(--brand-dark); font-size:12px; font-weight:700; padding:6px 12px; border-radius:999px; }
+
+  .stat-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .stat-card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .stat-card .sv{ font-size:22px; font-weight:700; }
+  .stat-card .sl{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+
+  .panel{ background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:24px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; padding:12px 16px; background:var(--cream); font-size:11.5px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--line); }
+  td{ padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tr:last-child td{ border-bottom:none; }
+
+  .badge{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; display:inline-block; }
+  .badge.in{ background:var(--ok-tint); color:var(--ok); }
+  .badge.low{ background:#FEF3DC; color:#946200; }
+  .badge.out{ background:var(--danger-tint); color:var(--danger); }
+  .badge.pending{ background:#FEF3DC; color:#946200; }
+  .badge.confirmed{ background:#E4EEFB; color:#1D5DAB; }
+  .badge.delivered{ background:var(--ok-tint); color:var(--ok); }
+  .badge.cancelled{ background:var(--danger-tint); color:var(--danger); }
+  .badge.express{ background:#FDEFE6; color:var(--brand-dark); }
+
+  .express-toggle{ display:flex; align-items:center; justify-content:center; gap:6px; }
+  .express-toggle input{ width:16px; height:16px; accent-color:var(--brand); cursor:pointer; }
+
+  .row-view{ background:var(--cream); color:var(--ink); font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:7px; }
+
+  /* ---------- Order details modal ---------- */
+  .omodal-overlay{
+    position:fixed; inset:0; background:rgba(20,15,10,0.55); display:none; align-items:center; justify-content:center;
+    z-index:300; padding:20px;
+  }
+  .omodal-overlay.show{ display:flex; }
+  .omodal{
+    background:#fff; border-radius:20px; width:100%; max-width:520px; padding:28px; position:relative;
+    max-height:88vh; overflow-y:auto;
+  }
+  .omodal h3{ font-size:19px; margin-bottom:4px; }
+  .omodal .osub{ font-size:12.5px; color:var(--ink-soft); margin-bottom:18px; }
+  .omodal-close{
+    position:absolute; top:18px; right:18px; font-size:18px; color:var(--ink-soft); background:var(--cream);
+    width:32px; height:32px; border-radius:50%;
+  }
+  .odetail-row{ display:flex; justify-content:space-between; font-size:13px; padding:9px 0; border-bottom:1px solid var(--line); }
+  .odetail-row:last-child{ border-bottom:none; }
+  .odetail-row span:first-child{ color:var(--ink-soft); font-weight:600; }
+  .odetail-row span:last-child{ font-weight:700; text-align:right; }
+  .oitems-list{ margin:14px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .oitem-row{ display:flex; justify-content:space-between; padding:10px 14px; font-size:13px; border-bottom:1px solid var(--line); background:var(--cream); }
+  .oitem-row:last-child{ border-bottom:none; }
+  .oitem-row .oi-name{ font-weight:600; }
+  .oitem-row .oi-qty{ color:var(--ink-soft); font-size:12px; }
+
+  select.stock-select, select.status-select{
+    border:1px solid var(--line); border-radius:7px; padding:6px 8px; font-size:12.5px; background:var(--cream);
+  }
+  input.inline-price{ width:80px; border:1px solid var(--line); border-radius:7px; padding:6px 8px; font-size:12.5px; }
+  .row-save{ background:var(--brand); color:#fff; font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:7px; }
+  .row-del{ background:var(--danger-tint); color:var(--danger); font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:7px; }
+
+  .empty-note{ padding:30px; text-align:center; color:var(--ink-soft); font-size:13px; }
+
+  .settings-form .field input, .settings-form .field textarea{
+    width:100%; max-width:480px; border:1px solid var(--line); background:var(--cream); border-radius:9px; padding:10px 13px; font-size:13px;
+  }
+  .settings-form{ padding:22px; }
+  .save-settings{ background:var(--brand); color:#fff; padding:11px 22px; border-radius:9px; font-weight:700; font-size:13px; margin-top:6px; }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff;
+    padding:12px 20px; border-radius:11px; font-size:13px; font-weight:600; z-index:200; opacity:0; pointer-events:none; transition:all .25s ease;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  .btn-primary{
+    background:var(--brand); color:#fff; padding:10px 18px; border-radius:9px; font-weight:700; font-size:13px;
+  }
+  .btn-primary:hover{ background:var(--brand-dark); }
+  .prod-thumb{
+    width:44px; height:44px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:20px; overflow:hidden; flex-shrink:0; border:1px solid var(--line);
+  }
+  .prod-thumb img{ width:100%; height:100%; object-fit:cover; }
+  .prod-name-cell{ display:flex; align-items:center; gap:10px; }
+  .row-edit{ background:#E4EEFB; color:#1D5DAB; font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:7px; }
+
+  /* ---------- Product modal ---------- */
+  .pmodal-overlay{
+    position:fixed; inset:0; background:rgba(20,15,10,0.55); display:none; align-items:center; justify-content:center;
+    z-index:300; padding:20px;
+  }
+  .pmodal-overlay.show{ display:flex; }
+  .pmodal{
+    background:#fff; border-radius:20px; width:100%; max-width:640px; padding:28px; position:relative;
+    max-height:92vh; overflow-y:auto;
+  }
+  .pmodal h3{ font-size:19px; margin-bottom:18px; }
+  .pmodal-close{
+    position:absolute; top:18px; right:18px; font-size:18px; color:var(--ink-soft); background:var(--cream);
+    width:32px; height:32px; border-radius:50%;
+  }
+  .pform-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pform-grid .full{ grid-column:1 / -1; }
+  @media (max-width:560px){ .pform-grid{ grid-template-columns:1fr; } }
+  .pform-grid .field label{ font-size:12px; font-weight:700; display:block; margin-bottom:5px; }
+  .pform-grid .field input, .pform-grid .field select{
+    width:100%; border:1px solid var(--line); background:var(--cream); border-radius:9px; padding:10px 12px; font-size:13px; outline:none;
+  }
+  .pform-grid .field input:focus, .pform-grid .field select:focus{ border-color:var(--brand); background:#fff; }
+  .image-upload-row{ display:flex; align-items:center; gap:14px; margin-top:4px; }
+  .banner-thumbs{ display:flex; flex-wrap:wrap; gap:12px; }
+  .banner-thumbs .bt-empty{ font-size:12.5px; color:var(--ink-soft); }
+  .banner-thumb-card{
+    position:relative; width:150px; height:84px; border-radius:12px; overflow:hidden;
+    border:1px solid var(--line); background:var(--cream); flex-shrink:0;
+  }
+  .banner-thumb-card img{ width:100%; height:100%; object-fit:cover; }
+  .banner-thumb-del{
+    position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(20,15,10,0.65); color:#fff; font-size:13px; display:flex; align-items:center; justify-content:center;
+  }
+  .banner-thumb-del:hover{ background:var(--danger); }
+  .image-preview{
+    width:70px; height:70px; border-radius:12px; background:var(--cream); border:1px dashed var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:26px; overflow:hidden; flex-shrink:0;
+  }
+  .image-preview img{ width:100%; height:100%; object-fit:cover; }
+  .upload-status{ font-size:11.5px; color:var(--ink-soft); }
+  .gallery-thumbs{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 10px; }
+  .gallery-thumb-item{ position:relative; width:64px; height:64px; border-radius:9px; overflow:hidden; border:1px solid var(--line); background:#f4f4f4; }
+  .gallery-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .gallery-thumb-item .gt-remove{
+    position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%;
+    background:rgba(0,0,0,.65); color:#fff; border:none; font-size:11px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .gallery-thumb-item.uploading{ opacity:.5; }
+  .pmodal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
+  .btn-cancel{ background:var(--cream); color:var(--ink); padding:11px 18px; border-radius:9px; font-weight:700; font-size:13px; }
+  .form-error{ color:var(--danger); font-size:12.5px; margin-top:12px; display:none; }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo">Nex<span>ify</span> Admin</div>
+    <div class="sub">Sign in to manage orders, stock &amp; storefront settings.</div>
+    <form id="login-form">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="login-username" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <button type="submit">Log In</button>
+      <div class="login-error" id="login-error">Invalid username or password.</div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard">
+  <aside class="sidebar">
+    <div class="logo">Nex<span>ify</span></div>
+    <div class="tag">Admin Dashboard</div>
+    <div class="nav-item active" data-tab="orders">📦 Orders</div>
+    <div class="nav-item" data-tab="products">🛍️ Products &amp; Stock</div>
+    <div class="nav-item" data-tab="settings">🎨 Banner &amp; Settings</div>
+    <div class="logout" id="logout-btn">⏻ Log out</div>
+  </aside>
+
+  <div class="content">
+    <!-- ORDERS TAB -->
+    <div class="tab-panel active" id="tab-orders">
+      <div class="content-head"><h2>Orders</h2><span class="pill" id="order-count-pill">0 orders</span></div>
+      <div class="stat-row" id="order-stats"></div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Address</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody id="orders-tbody"><tr><td colspan="7" class="empty-note">Loading orders…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS TAB -->
+    <div class="tab-panel" id="tab-products">
+      <div class="content-head">
+        <h2>Products &amp; Stock</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="pill" id="product-count-pill">0 products</span>
+          <button class="btn-primary" id="add-product-btn">+ Add Product</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Discount</th><th>Stock</th><th>⚡ 30-Min</th><th></th></tr></thead>
+          <tbody id="products-tbody"><tr><td colspan="7" class="empty-note">Loading products…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="content-head"><h2>Banner &amp; Site Settings</h2></div>
+
+      <div class="panel settings-form">
+        <div class="field">
+          <label>Homepage Banners</label>
+          <div class="banner-thumbs" id="banner-thumbs"><!-- rendered by JS --></div>
+          <div class="image-upload-row" style="margin-top:10px;">
+            <div>
+              <input type="file" id="banner-file-input" accept="image/png,image/jpeg,image/webp,image/gif">
+              <div class="upload-status" id="banner-upload-status">
+                Add one image, or several — with 2+, they'll auto-slide on the storefront. JPG, PNG, WEBP or GIF, up to 5MB.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel settings-form">
+        <div class="field">
+          <label>UPI ID for Payments</label>
+          <input id="s-upi_id" type="text" placeholder="yourname@okhdfcbank">
+          <div class="upload-status" style="margin-top:6px;">
+            Customers will see a QR code / pay button for this UPI ID at checkout. Leave blank to hide online payment and only offer Cash on Delivery.
+          </div>
+        </div>
+        <div class="field"><label>Free Delivery Threshold (₹)</label><input id="s-free_delivery_threshold" type="number"></div>
+        <button class="save-settings" id="save-settings-btn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ============ ADD / EDIT PRODUCT MODAL ============ -->
+<div class="pmodal-overlay" id="pmodal-overlay">
+  <div class="pmodal">
+    <button class="pmodal-close" onclick="closeProductModal()">✕</button>
+    <h3 id="pmodal-title">Add Product</h3>
+    <form id="product-form">
+      <div class="pform-grid">
+        <div class="field full">
+          <label>Product Name</label>
+          <input type="text" id="pf-name" placeholder="e.g. boAt Airdopes 141" required>
+        </div>
+
+        <div class="field full">
+          <label>Photo</label>
+          <div class="image-upload-row">
+            <div class="image-preview" id="pf-image-preview">📦</div>
+            <div>
+              <input type="file" id="pf-image-file" accept="image/png,image/jpeg,image/webp,image/gif">
+              <div class="upload-status" id="pf-upload-status">JPG, PNG, WEBP or GIF — up to 5MB. Leave blank to use the emoji icon instead.</div>
+            </div>
+          </div>
+          <input type="hidden" id="pf-image-url">
+        </div>
+
+        <div class="field full" id="pf-gallery-field" style="display:none;">
+          <label>Gallery Photos <span style="font-weight:400; color:var(--ink-soft);">(extra photos customers can browse, like on Amazon — stored in MongoDB)</span></label>
+          <div class="gallery-thumbs" id="pf-gallery-thumbs"></div>
+          <input type="file" id="pf-gallery-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+          <div class="upload-status" id="pf-gallery-status">Select one or more photos — they upload and attach right away.</div>
+        </div>
+        <div class="field full" id="pf-gallery-hint" style="display:none;">
+          <div class="upload-status">Save this product first — you can add gallery photos once it exists.</div>
+        </div>
+
+        <div class="field">
+          <label>Category</label>
+          <input type="text" id="pf-category" list="category-options" placeholder="e.g. Electronics">
+          <datalist id="category-options">
+            <option value="Electronics"><option value="Fashion"><option value="Grooming">
+            <option value="Daily Essentials"><option value="Books & Stationery">
+            <option value="Sports"><option value="Snacks">
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Fallback Emoji Icon</label>
+          <input type="text" id="pf-emoji" placeholder="📦" maxlength="4">
+        </div>
+
+        <div class="field">
+          <label>Price (₹)</label>
+          <input type="number" id="pf-price" min="0" required>
+        </div>
+        <div class="field">
+          <label>Original / Old Price (₹)</label>
+          <input type="number" id="pf-old_price" min="0" placeholder="optional">
+        </div>
+
+        <div class="field">
+          <label>Discount (%)</label>
+          <input type="number" id="pf-discount" min="0" max="95" value="0">
+        </div>
+        <div class="field">
+          <label>Stock Status</label>
+          <select id="pf-stock">
+            <option value="in">In Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Rating (0–5) — starting value</label>
+          <input type="number" id="pf-rating" min="0" max="5" step="0.1" value="4.5">
+        </div>
+        <div class="field">
+          <label>Reviews Count — starting value</label>
+          <input type="text" id="pf-reviews" placeholder="e.g. 1.2k" value="0">
+          <div style="font-size:11px; color:var(--ink-soft); margin-top:5px; line-height:1.4;">
+            Customers now leave real reviews on items they've ordered (from "My Orders" on the
+            storefront, once delivered). Once the first real review comes in, this rating and
+            count switch to being calculated automatically from those reviews — this field is
+            just the placeholder shown until then.
+          </div>
+        </div>
+
+        <div class="field full" style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+          <input type="checkbox" id="pf-express" style="width:17px; height:17px; accent-color:var(--brand); cursor:pointer;">
+          <label for="pf-express" style="margin-bottom:0; cursor:pointer;">⚡ Enable 30-Minute Delivery for this item</label>
+        </div>
+      </div>
+      <div class="form-error" id="pform-error"></div>
+      <div class="pmodal-actions">
+        <button type="button" class="btn-cancel" onclick="closeProductModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="pf-submit-btn">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ORDER DETAILS MODAL ============ -->
+<div class="omodal-overlay" id="omodal-overlay">
+  <div class="omodal" id="omodal-box">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+// API_BASE now comes from config.js (shared with index.html)
+let token = null; // kept in memory only — logging out or refreshing clears the session
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+async function api(path, options = {}){
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if(!res.ok){
+    const err = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(err.error || "Request failed");
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+/* ---------------- Login ---------------- */
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errBox = document.getElementById('login-error');
+  errBox.style.display = "none";
+  try{
+    const data = await api('/api/admin/login', {
+      method: "POST",
+      body: JSON.stringify({ username, password })
+    });
+    token = data.token;
+    document.getElementById('login-screen').style.display = "none";
+    document.getElementById('dashboard').classList.add('show');
+    loadOrders();
+    loadProducts();
+    loadSettings();
+    loadBanners();
+  } catch(err){
+    errBox.textContent = err.message === "Failed to fetch"
+      ? "Can't reach the backend. Is it running and is API_BASE set correctly?"
+      : "Invalid username or password.";
+    errBox.style.display = "block";
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  token = null;
+  document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('login-screen').style.display = "flex";
+  document.getElementById('login-username').value = "";
+  document.getElementById('login-password').value = "";
+});
+
+/* ---------------- Tabs ---------------- */
+document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item[data-tab]').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById(`tab-${item.dataset.tab}`).classList.add('active');
+  });
+});
+
+/* ---------------- Orders ---------------- */
+let ORDERS_CACHE = [];
+
+async function loadOrders(){
+  try{
+    const orders = await api('/api/admin/orders');
+    ORDERS_CACHE = orders;
+    document.getElementById('order-count-pill').textContent = `${orders.length} orders`;
+
+    const counts = { pending:0, confirmed:0, delivered:0, cancelled:0 };
+    orders.forEach(o => { if(counts[o.status] !== undefined) counts[o.status]++; });
+    document.getElementById('order-stats').innerHTML = `
+      <div class="stat-card"><div class="sv">${counts.pending}</div><div class="sl">Pending</div></div>
+      <div class="stat-card"><div class="sv">${counts.confirmed}</div><div class="sl">Confirmed</div></div>
+      <div class="stat-card"><div class="sv">${counts.delivered}</div><div class="sl">Delivered</div></div>
+      <div class="stat-card"><div class="sv">${counts.cancelled}</div><div class="sl">Cancelled</div></div>
+    `;
+
+    const tbody = document.getElementById('orders-tbody');
+    if(orders.length === 0){
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-note">No orders yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = orders.map(o => {
+      const itemsSummary = (o.items || []).map(i => `${i.name} ×${i.qty}`).join(", ");
+      const paymentTag = o.payment_method === "upi"
+        ? (o.payment_status === "paid"
+            ? `<span class="badge delivered" style="margin-top:4px; display:inline-block;">UPI Paid</span>`
+            : `<span class="badge pending" style="margin-top:4px; display:inline-block;">UPI • Verify</span>`)
+        : `<span style="font-size:11px; color:var(--ink-soft);">COD</span>`;
+      return `
+      <tr>
+        <td><strong>${o.order_ref}</strong><br>${paymentTag}</td>
+        <td>${o.customer_name}<br><span style="color:var(--ink-soft)">${o.customer_mobile}</span></td>
+        <td>${o.customer_address}</td>
+        <td>${itemsSummary}</td>
+        <td>₹${o.total}</td>
+        <td>
+          <select class="status-select" onchange="updateOrderStatus('${o.order_ref}', this.value)">
+            ${["pending","confirmed","delivered","cancelled"].map(s =>
+              `<option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>`).join("")}
+          </select>
+        </td>
+        <td><button class="row-view" onclick="openOrderDetails('${o.order_ref}')">View</button></td>
+      </tr>`;
+    }).join("");
+  } catch(err){
+    document.getElementById('orders-tbody').innerHTML =
+      `<tr><td colspan="7" class="empty-note">Couldn't load orders: ${err.message}</td></tr>`;
+  }
+}
+
+async function updateOrderStatus(orderRef, status){
+  try{
+    await api(`/api/admin/orders/${orderRef}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status })
+    });
+    showToast(`Order ${orderRef} marked as ${status}`);
+    loadOrders();
+  } catch(err){
+    showToast(`Failed to update: ${err.message}`);
+  }
+}
+
+function openOrderDetails(orderRef){
+  const o = ORDERS_CACHE.find(x => x.order_ref === orderRef);
+  if(!o) return;
+  const itemsHTML = (o.items || []).map(i => `
+    <div class="oitem-row">
+      <div>
+        <div class="oi-name">${i.name}</div>
+        <div class="oi-qty">Qty: ${i.qty} × ₹${i.price}</div>
+      </div>
+      <div>₹${i.price * i.qty}</div>
+    </div>`).join("");
+
+  const paymentRow = o.payment_method === "upi"
+    ? `
+      <div class="odetail-row"><span>Payment</span><span>UPI — <span class="badge ${o.payment_status === 'paid' ? 'delivered' : 'pending'}">${o.payment_status === 'paid' ? 'Paid ✓' : 'Verify UTR'}</span></span></div>
+      <div class="odetail-row"><span>UTR Number</span><span>${o.utr_number || '—'}</span></div>
+      ${o.payment_status !== 'paid' ? `
+      <div style="margin-top:10px;">
+        <button class="row-view" style="width:100%; padding:10px;" onclick="markPaymentPaid('${o.order_ref}')">
+          ✅ I've checked my bank — Mark as Paid
+        </button>
+      </div>` : ''}
+    `
+    : `<div class="odetail-row"><span>Payment</span><span>Cash on Delivery</span></div>`;
+
+  document.getElementById('omodal-box').innerHTML = `
+    <button class="omodal-close" onclick="closeOrderDetails()">✕</button>
+    <h3>Order ${o.order_ref}</h3>
+    <div class="osub">Placed ${o.placed_at ? new Date(o.placed_at).toLocaleString() : ""}</div>
+    <div class="odetail-row"><span>Status</span><span><span class="badge ${o.status}">${o.status}</span></span></div>
+    <div class="odetail-row"><span>Customer</span><span>${o.customer_name}</span></div>
+    <div class="odetail-row"><span>Mobile</span><span>${o.customer_mobile}</span></div>
+    <div class="odetail-row"><span>Address</span><span>${o.customer_address}</span></div>
+    ${paymentRow}
+    <div class="oitems-list">${itemsHTML}</div>
+    <div class="odetail-row"><span>Order Total</span><span>₹${o.total}</span></div>
+    <div style="margin-top:16px;">
+      <label style="font-size:12px; font-weight:700; display:block; margin-bottom:6px;">Update Status</label>
+      <select class="status-select" style="width:100%; padding:10px;" onchange="updateOrderStatus('${o.order_ref}', this.value); closeOrderDetails();">
+        ${["pending","confirmed","delivered","cancelled"].map(s =>
+          `<option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>`).join("")}
+      </select>
+    </div>
+  `;
+  document.getElementById('omodal-overlay').classList.add('show');
+}
+
+async function markPaymentPaid(orderRef){
+  try{
+    await api(`/api/admin/orders/${orderRef}/payment-status`, {
+      method: "PUT",
+      body: JSON.stringify({ payment_status: "paid" })
+    });
+    showToast("Marked as paid");
+    const cached = ORDERS_CACHE.find(o => o.order_ref === orderRef);
+    if(cached) cached.payment_status = "paid";
+    openOrderDetails(orderRef); // re-render with updated state
+    loadOrders(); // refresh table in background
+  } catch(err){
+    showToast(`Failed to update: ${err.message}`);
+  }
+}
+
+function closeOrderDetails(){
+  document.getElementById('omodal-overlay').classList.remove('show');
+}
+document.getElementById('omodal-overlay').addEventListener('click', (e) => {
+  if(e.target.id === 'omodal-overlay') closeOrderDetails();
+});
+
+/* ---------------- Products ---------------- */
+let PRODUCTS_CACHE = [];
+
+async function loadProducts(){
+  try{
+    const products = await api('/api/products'); // public endpoint, no admin auth needed to read
+    PRODUCTS_CACHE = products;
+    document.getElementById('product-count-pill').textContent = `${products.length} products`;
+    const tbody = document.getElementById('products-tbody');
+    if(products.length === 0){
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-note">No products yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = products.map(p => `
+      <tr data-id="${p.id}">
+        <td>
+          <div class="prod-name-cell">
+            <div class="prod-thumb">${p.image_url ? `<img src="${p.image_url}" alt="">` : (p.emoji || "📦")}</div>
+            <span>${p.name}</span>
+          </div>
+        </td>
+        <td>${p.category || "—"}</td>
+        <td>₹<input class="inline-price" type="number" value="${p.price}" data-field="price"></td>
+        <td><input class="inline-price" type="number" value="${p.discount || 0}" data-field="discount">%</td>
+        <td>
+          <select class="stock-select" data-field="stock">
+            <option value="in" ${p.stock === "in" ? "selected" : ""}>In Stock</option>
+            <option value="low" ${p.stock === "low" ? "selected" : ""}>Low Stock</option>
+            <option value="out" ${p.stock === "out" ? "selected" : ""}>Out of Stock</option>
+          </select>
+        </td>
+        <td>
+          <div class="express-toggle">
+            <input type="checkbox" data-field="express_delivery" ${p.express_delivery ? "checked" : ""}
+              onchange="quickToggleExpress('${p.id}', this.checked)">
+          </div>
+        </td>
+        <td style="white-space:nowrap;">
+          <button class="row-edit" onclick="openProductModal('${p.id}')">Edit</button>
+          <button class="row-save" onclick="saveProduct('${p.id}', this)">Save</button>
+          <button class="row-del" onclick="deleteProduct('${p.id}')">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+  } catch(err){
+    document.getElementById('products-tbody').innerHTML =
+      `<tr><td colspan="7" class="empty-note">Couldn't load products: ${err.message}</td></tr>`;
+  }
+}
+
+async function saveProduct(id, btn){
+  const row = btn.closest('tr');
+  const price = parseInt(row.querySelector('[data-field="price"]').value, 10);
+  const discount = parseInt(row.querySelector('[data-field="discount"]').value, 10);
+  const stock = row.querySelector('[data-field="stock"]').value;
+  const express_delivery = row.querySelector('[data-field="express_delivery"]').checked;
+  try{
+    await api(`/api/admin/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ price, discount, stock, express_delivery })
+    });
+    showToast("Product updated");
+  } catch(err){
+    showToast(`Failed to save: ${err.message}`);
+  }
+}
+
+async function quickToggleExpress(id, checked){
+  try{
+    await api(`/api/admin/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ express_delivery: checked })
+    });
+    showToast(checked ? "⚡ 30-min delivery enabled" : "30-min delivery disabled");
+    const cached = PRODUCTS_CACHE.find(p => p.id === id);
+    if(cached) cached.express_delivery = checked;
+  } catch(err){
+    showToast(`Failed to update: ${err.message}`);
+    loadProducts();
+  }
+}
+
+async function deleteProduct(id){
+  if(!confirm("Remove this product from the storefront?")) return;
+  try{
+    await api(`/api/admin/products/${id}`, { method: "DELETE" });
+    showToast("Product deleted");
+    loadProducts();
+  } catch(err){
+    showToast(`Failed to delete: ${err.message}`);
+  }
+}
+
+/* ---------------- Add / Edit Product Modal ---------------- */
+let editingProductId = null;
+let selectedImageFile = null;
+
+document.getElementById('add-product-btn').addEventListener('click', () => openProductModal(null));
+
+function openProductModal(id){
+  editingProductId = id;
+  selectedImageFile = null;
+  document.getElementById('pform-error').style.display = "none";
+  document.getElementById('product-form').reset();
+  document.getElementById('pf-image-url').value = "";
+  document.getElementById('pf-image-preview').innerHTML = "📦";
+  document.getElementById('pf-upload-status').textContent =
+    "JPG, PNG, WEBP or GIF — up to 5MB. Leave blank to use the emoji icon instead.";
+  document.getElementById('pf-express').checked = false;
+  document.getElementById('pf-gallery-thumbs').innerHTML = "";
+  document.getElementById('pf-gallery-file').value = "";
+  document.getElementById('pf-gallery-status').textContent = "Select one or more photos — they upload and attach right away.";
+
+  if(id){
+    const p = PRODUCTS_CACHE.find(x => x.id === id);
+    document.getElementById('pmodal-title').textContent = "Edit Product";
+    document.getElementById('pf-gallery-field').style.display = "";
+    document.getElementById('pf-gallery-hint').style.display = "none";
+    if(p){
+      document.getElementById('pf-name').value = p.name || "";
+      document.getElementById('pf-category').value = p.category || "";
+      document.getElementById('pf-emoji').value = p.emoji || "📦";
+      document.getElementById('pf-price').value = p.price ?? "";
+      document.getElementById('pf-old_price').value = p.old_price ?? "";
+      document.getElementById('pf-discount').value = p.discount ?? 0;
+      document.getElementById('pf-stock').value = p.stock || "in";
+      document.getElementById('pf-rating').value = p.rating ?? 4.5;
+      document.getElementById('pf-reviews').value = p.reviews ?? "0";
+      document.getElementById('pf-express').checked = !!p.express_delivery;
+      if(p.image_url){
+        document.getElementById('pf-image-url').value = p.image_url;
+        document.getElementById('pf-image-preview').innerHTML = `<img src="${p.image_url}" alt="">`;
+      }
+      renderGalleryThumbs(p.gallery_images || []);
+    }
+  } else {
+    document.getElementById('pmodal-title').textContent = "Add Product";
+    document.getElementById('pf-gallery-field').style.display = "none";
+    document.getElementById('pf-gallery-hint').style.display = "";
+  }
+  document.getElementById('pmodal-overlay').classList.add('show');
+}
+
+/* ---------------- Gallery photos (extra images, stored in MongoDB) ---------------- */
+
+function renderGalleryThumbs(images){
+  const box = document.getElementById('pf-gallery-thumbs');
+  box.innerHTML = (images || []).map(url => `
+    <div class="gallery-thumb-item">
+      <img src="${url}" alt="">
+      <button type="button" class="gt-remove" title="Remove" onclick="removeGalleryImage(this, '${url.replace(/'/g, "\\'")}')">✕</button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('pf-gallery-file').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  if(!files.length || !editingProductId) return;
+  const status = document.getElementById('pf-gallery-status');
+
+  for(const file of files){
+    status.textContent = `Uploading ${file.name}...`;
+    try{
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch(`${API_BASE}/api/admin/upload-image`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+        body: formData
+      });
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if(!uploadRes.ok) throw new Error(uploadData.error || "upload failed");
+
+      const addRes = await api(`/api/admin/products/${editingProductId}/gallery`, {
+        method: "POST",
+        body: JSON.stringify({ image_url: uploadData.url })
+      });
+      renderGalleryThumbs(addRes.images || []);
+      const cached = PRODUCTS_CACHE.find(p => p.id === editingProductId);
+      if(cached) cached.gallery_images = addRes.images || [];
+    } catch(err){
+      status.textContent = `Failed to add ${file.name}: ${err.message}`;
+      return;
+    }
+  }
+  status.textContent = "All set — select more photos to add another.";
+  e.target.value = "";
+});
+
+async function removeGalleryImage(btn, imageUrl){
+  if(!editingProductId) return;
+  btn.disabled = true;
+  try{
+    const res = await api(`/api/admin/products/${editingProductId}/gallery`, {
+      method: "DELETE",
+      body: JSON.stringify({ image_url: imageUrl })
+    });
+    renderGalleryThumbs(res.images || []);
+    const cached = PRODUCTS_CACHE.find(p => p.id === editingProductId);
+    if(cached) cached.gallery_images = res.images || [];
+  } catch(err){
+    showToast(`Failed to remove photo: ${err.message}`);
+    btn.disabled = false;
+  }
+}
+
+function closeProductModal(){
+  document.getElementById('pmodal-overlay').classList.remove('show');
+  editingProductId = null;
+  selectedImageFile = null;
+}
+document.getElementById('pmodal-overlay').addEventListener('click', (e) => {
+  if(e.target.id === 'pmodal-overlay') closeProductModal();
+});
+
+document.getElementById('pf-image-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  selectedImageFile = file;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('pf-image-preview').innerHTML = `<img src="${reader.result}" alt="">`;
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('pf-upload-status').textContent = `Selected: ${file.name} (will upload on save)`;
+});
+
+async function uploadSelectedImage(){
+  const formData = new FormData();
+  formData.append("file", selectedImageFile);
+  const res = await fetch(`${API_BASE}/api/admin/upload-image`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+    body: formData
+  });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(data.error || "Image upload failed");
+  return data.url;
+}
+
+document.getElementById('product-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errBox = document.getElementById('pform-error');
+  errBox.style.display = "none";
+  const submitBtn = document.getElementById('pf-submit-btn');
+  const originalLabel = submitBtn.textContent;
+
+  const name = document.getElementById('pf-name').value.trim();
+  const price = document.getElementById('pf-price').value;
+  if(!name || price === ""){
+    errBox.textContent = "Product name and price are required.";
+    errBox.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  try{
+    let imageUrl = document.getElementById('pf-image-url').value || null;
+    if(selectedImageFile){
+      submitBtn.textContent = "Uploading photo...";
+      imageUrl = await uploadSelectedImage();
+    }
+
+    const payload = {
+      name,
+      category: document.getElementById('pf-category').value.trim() || "General",
+      emoji: document.getElementById('pf-emoji').value.trim() || "📦",
+      price: parseInt(price, 10),
+      old_price: document.getElementById('pf-old_price').value === "" ? null : parseInt(document.getElementById('pf-old_price').value, 10),
+      discount: parseInt(document.getElementById('pf-discount').value || 0, 10),
+      stock: document.getElementById('pf-stock').value,
+      rating: parseFloat(document.getElementById('pf-rating').value || 4.5),
+      reviews: document.getElementById('pf-reviews').value.trim() || "0",
+      image_url: imageUrl,
+      express_delivery: document.getElementById('pf-express').checked,
+    };
+
+    submitBtn.textContent = "Saving...";
+    if(editingProductId){
+      await api(`/api/admin/products/${editingProductId}`, { method: "PUT", body: JSON.stringify(payload) });
+      showToast("Product updated");
+    } else {
+      await api('/api/admin/products', { method: "POST", body: JSON.stringify(payload) });
+      showToast("Product added");
+    }
+    closeProductModal();
+    loadProducts();
+  } catch(err){
+    errBox.textContent = err.message || "Something went wrong.";
+    errBox.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
+  }
+});
+
+/* ---------------- Settings / Banner ---------------- */
+async function loadSettings(){
+  try{
+    const settings = await api('/api/settings'); // public read
+    Object.entries(settings).forEach(([key, value]) => {
+      const el = document.getElementById(`s-${key}`);
+      if(el) el.value = value;
+    });
+  } catch(err){
+    showToast(`Couldn't load settings: ${err.message}`);
+  }
+}
+
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  const payload = {
+    upi_id: document.getElementById('s-upi_id').value.trim(),
+    free_delivery_threshold: document.getElementById('s-free_delivery_threshold').value,
+  };
+  try{
+    await api('/api/admin/settings', { method: "PUT", body: JSON.stringify(payload) });
+    showToast("Settings saved");
+  } catch(err){
+    showToast(`Failed to save: ${err.message}`);
+  }
+});
+
+/* ---------------- Homepage Banners ---------------- */
+let BANNERS_CACHE = [];
+
+async function loadBanners(){
+  try{
+    const banners = await api('/api/banners'); // public read
+    BANNERS_CACHE = Array.isArray(banners) ? banners : [];
+    renderBannerThumbs();
+  } catch(err){
+    document.getElementById('banner-thumbs').innerHTML =
+      `<div class="bt-empty">Couldn't load banners: ${err.message}</div>`;
+  }
+}
+
+function renderBannerThumbs(){
+  const wrap = document.getElementById('banner-thumbs');
+  if(BANNERS_CACHE.length === 0){
+    wrap.innerHTML = `<div class="bt-empty">No banners yet — add one below. It'll show as the homepage banner.</div>`;
+    return;
+  }
+  wrap.innerHTML = BANNERS_CACHE.map(b => `
+    <div class="banner-thumb-card">
+      <img src="${b.image_url}" alt="Banner">
+      <button type="button" class="banner-thumb-del" onclick="deleteBanner('${b.id}')" title="Remove banner">✕</button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('banner-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('banner-upload-status');
+  const originalStatus = statusEl.textContent;
+  statusEl.textContent = "Uploading…";
+  try{
+    const formData = new FormData();
+    formData.append("file", file);
+    const uploadRes = await fetch(`${API_BASE}/api/admin/upload-image`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: formData
+    });
+    const uploadData = await uploadRes.json().catch(() => ({}));
+    if(!uploadRes.ok) throw new Error(uploadData.error || "Image upload failed");
+
+    await api('/api/admin/banners', {
+      method: "POST",
+      body: JSON.stringify({ image_url: uploadData.url })
+    });
+    showToast("Banner added");
+    await loadBanners();
+  } catch(err){
+    showToast(`Failed to add banner: ${err.message}`);
+  } finally {
+    statusEl.textContent = originalStatus;
+    e.target.value = "";
+  }
+});
+
+async function deleteBanner(id){
+  if(!confirm("Remove this banner from the storefront?")) return;
+  try{
+    await api(`/api/admin/banners/${id}`, { method: "DELETE" });
+    showToast("Banner removed");
+    loadBanners();
+  } catch(err){
+    showToast(`Failed to remove: ${err.message}`);
+  }
+}
+</script>
+</body>
+</html>
