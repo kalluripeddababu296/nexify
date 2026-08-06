@@ -439,7 +439,7 @@ def send_email(subject, body_text, to_email):
         return True, None
 
     except Exception as e:
-    return False, str(e)
+        return False, str(e)
 
 
 def notify_admin_new_order(row):
