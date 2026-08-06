@@ -75,8 +75,12 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
 supabase: Client = create_client(SUPABASE_URL or "", SUPABASE_SERVICE_KEY or "")
 
 app = Flask(__name__)
-CORS(app)  # allow the storefront/admin HTML (served from anywhere) to call this API
 
+CORS(
+    app,
+    resources={r"/*": {"origins": "https://nexifyonline.netlify.app"}},
+    supports_credentials=False
+)
 # --------------------------------------------------------------------------
 # MongoDB — used ONLY for each product's extra "gallery" photos (the
 # Amazon-style row of extra thumbnails on the product page). Everything else
@@ -456,32 +460,40 @@ def notify_admin_new_order(row):
         print("Order email notification failed:", err)
 
 
-@app.post("/api/support")
+@app.route("/api/support", methods=["POST", "OPTIONS"])
 def submit_support_message():
-    """Public — the 'Customer Care' button in the storefront header submits
-    here. The message is emailed straight to CUSTOMER_CARE_EMAIL — it never
-    opens the visitor's own mail app, and there's no redirect involved."""
-    body = request.get_json(force=True) or {}
-    name = (body.get("name") or "").strip() or "A customer"
-    contact = (body.get("contact") or "").strip()
-    message = (body.get("message") or "").strip()
+    try:
+        body = request.get_json(force=True) or {}
+        name = (body.get("name") or "").strip() or "A customer"
+        contact = (body.get("contact") or "").strip()
+        message = (body.get("message") or "").strip()
 
-    if not message:
-        return jsonify({"error": "message is required"}), 400
-    if len(message) > 2000:
-        return jsonify({"error": "message is too long (max 2000 characters)"}), 400
+        if not message:
+            return jsonify({"error": "message is required"}), 400
 
-    body_text = (
-        f"New Customer Care message\n\n"
-        f"From: {name}\n"
-        f"Contact: {contact or 'not provided'}\n\n"
-        f"Message:\n{message}"
-    )
-    ok, err = send_email(f"Nexify Customer Care — message from {name}", body_text, CUSTOMER_CARE_EMAIL)
-    if not ok:
-        return jsonify({"error": f"couldn't send your message: {err}"}), 500
-    return jsonify({"ok": True}), 201
+        body_text = (
+            f"New Customer Care message\n\n"
+            f"From: {name}\n"
+            f"Contact: {contact or 'not provided'}\n\n"
+            f"Message:\n{message}"
+        )
 
+        ok, err = send_email(
+            f"Nexify Customer Care — message from {name}",
+            body_text,
+            CUSTOMER_CARE_EMAIL
+        )
+
+        if not ok:
+            print("SMTP ERROR:", err)
+            return jsonify({"error": err}), 500
+
+        return jsonify({"ok": True}), 201
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 # --------------------------------------------------------------------------
 # Admin: auth
