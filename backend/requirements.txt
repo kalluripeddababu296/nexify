@@ -5,3 +5,4 @@ pyjwt
 python-dotenv
 pymongo
 gunicorn
+requests
