@@ -428,7 +428,7 @@ def send_email(subject, body_text, to_email):
     msg["To"] = to_email
 
     try:
-        with smtplib.SMTP(smtp_host, int(os.environ.get("SMTP_PORT", 587))) as server:
+        with smtplib.SMTP(smtp_host, int(os.environ.get("SMTP_PORT", 587)), timeout=10) as server:
             server.starttls()
             server.login(
                 os.environ.get("SMTP_USER", ""),
