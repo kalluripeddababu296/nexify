@@ -463,8 +463,13 @@ def notify_admin_new_order(row):
 
 @app.route("/api/support", methods=["POST", "OPTIONS"])
 def submit_support_message():
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return "", 204
+
     try:
-        body = request.get_json(force=True) or {}
+        body = request.get_json(silent=True) or {}
+
         name = (body.get("name") or "").strip() or "A customer"
         contact = (body.get("contact") or "").strip()
         message = (body.get("message") or "").strip()
@@ -495,7 +500,6 @@ def submit_support_message():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 # --------------------------------------------------------------------------
 # Admin: auth
 # --------------------------------------------------------------------------
