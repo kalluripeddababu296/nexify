@@ -78,8 +78,9 @@ app = Flask(__name__)
 
 CORS(
     app,
-    resources={r"/*": {"origins": "https://nexifyonline.netlify.app"}},
-    supports_credentials=False
+    origins=["https://nexifyonline.netlify.app"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 # --------------------------------------------------------------------------
 # MongoDB — used ONLY for each product's extra "gallery" photos (the
