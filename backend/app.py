@@ -427,14 +427,35 @@ def send_email(subject, body_text, to_email):
     msg["From"] = os.environ.get("SMTP_FROM", "noreply@nexify.app")
     msg["To"] = to_email
 
-    try:
-        with smtplib.SMTP(smtp_host, int(os.environ.get("SMTP_PORT", 587))) as server:
-            server.starttls()
-            server.login(os.environ.get("SMTP_USER", ""), os.environ.get("SMTP_PASS", ""))
-            server.send_message(msg)
-        return True, None
-    except Exception as e:
-        return False, str(e)
+   try:
+    print("Connecting to SMTP...")
+
+    with smtplib.SMTP(
+        smtp_host,
+        int(os.environ.get("SMTP_PORT", 587)),
+        timeout=10
+    ) as server:
+
+        print("Connected")
+        server.starttls()
+
+        print("TLS OK")
+        server.login(
+            os.environ.get("SMTP_USER", ""),
+            os.environ.get("SMTP_PASS", "")
+        )
+
+        print("Login OK")
+        server.send_message(msg)
+
+        print("Mail Sent")
+
+    return True, None
+
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    return False, str(e)
 
 
 def notify_admin_new_order(row):
@@ -499,8 +520,7 @@ def submit_support_message():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-# --------------------------------------------------------------------------
+        return jsonify({"error": str(e)}), 500# --------------------------------------------------------------------------
 # Admin: auth
 # --------------------------------------------------------------------------
 
