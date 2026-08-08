@@ -342,9 +342,9 @@
           <label>Category</label>
           <input type="text" id="pf-category" list="category-options" placeholder="e.g. Electronics">
           <datalist id="category-options">
-            <option value="Electronics"><option value="rakhi"><option value="Grooming">
+            <option value="Electronics"><option value="Fashion"><option value="Grooming">
             <option value="Daily Essentials"><option value="Books & Stationery">
-            <option value="Sports"><option value="Fashion">
+            <option value="Sports"><option value="Snacks">
           </datalist>
         </div>
         <div class="field">
@@ -366,12 +366,11 @@
           <input type="number" id="pf-discount" min="0" max="95" value="0">
         </div>
         <div class="field">
-          <label>Stock Status</label>
-          <select id="pf-stock">
-            <option value="in">In Stock</option>
-            <option value="low">Low Stock</option>
-            <option value="out">Out of Stock</option>
-          </select>
+          <label>Stock (pieces)</label>
+          <input type="number" id="pf-stock-qty" min="0" step="1" value="0" oninput="updateStockPreview()">
+          <div style="font-size:11px; color:var(--ink-soft); margin-top:5px;" id="pf-stock-preview">
+            Shows as <strong>Out of Stock</strong> when it hits 0 — updates automatically as orders come in.
+          </div>
         </div>
 
         <div class="field">
@@ -644,11 +643,11 @@ async function loadProducts(){
         <td>₹<input class="inline-price" type="number" value="${p.price}" data-field="price"></td>
         <td><input class="inline-price" type="number" value="${p.discount || 0}" data-field="discount">%</td>
         <td>
-          <select class="stock-select" data-field="stock">
-            <option value="in" ${p.stock === "in" ? "selected" : ""}>In Stock</option>
-            <option value="low" ${p.stock === "low" ? "selected" : ""}>Low Stock</option>
-            <option value="out" ${p.stock === "out" ? "selected" : ""}>Out of Stock</option>
-          </select>
+          <input class="inline-price" type="number" min="0" step="1" style="width:64px;"
+            value="${p.stock_qty ?? 0}" data-field="stock_qty" title="Pieces in stock">
+          <div style="font-size:10.5px; margin-top:3px; color:${p.stock === 'out' ? '#C0392B' : p.stock === 'low' ? '#B8860B' : '#2E7D32'};">
+            ${p.stock === 'out' ? 'Out of stock' : p.stock === 'low' ? 'Low stock' : 'In stock'}
+          </div>
         </td>
         <td>
           <div class="express-toggle">
@@ -673,12 +672,12 @@ async function saveProduct(id, btn){
   const row = btn.closest('tr');
   const price = parseInt(row.querySelector('[data-field="price"]').value, 10);
   const discount = parseInt(row.querySelector('[data-field="discount"]').value, 10);
-  const stock = row.querySelector('[data-field="stock"]').value;
+  const stock_qty = parseInt(row.querySelector('[data-field="stock_qty"]').value, 10);
   const express_delivery = row.querySelector('[data-field="express_delivery"]').checked;
   try{
     await api(`/api/admin/products/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ price, discount, stock, express_delivery })
+      body: JSON.stringify({ price, discount, stock_qty, express_delivery })
     });
     showToast("Product updated");
   } catch(err){
@@ -716,6 +715,18 @@ async function deleteProduct(id){
 let editingProductId = null;
 let selectedImageFile = null;
 
+function updateStockPreview(){
+  const qty = parseInt(document.getElementById('pf-stock-qty').value || 0, 10);
+  const box = document.getElementById('pf-stock-preview');
+  if(qty <= 0){
+    box.innerHTML = 'Shows as <strong style="color:#C0392B;">Out of Stock</strong> — hidden from checkout until restocked.';
+  } else if(qty <= 5){
+    box.innerHTML = `Shows as <strong style="color:#B8860B;">Low Stock</strong> (${qty} left) — a "hurry" badge appears on the storefront.`;
+  } else {
+    box.innerHTML = `Shows as <strong style="color:#2E7D32;">In Stock</strong> (${qty} available).`;
+  }
+}
+
 document.getElementById('add-product-btn').addEventListener('click', () => openProductModal(null));
 
 function openProductModal(id){
@@ -728,6 +739,7 @@ function openProductModal(id){
   document.getElementById('pf-upload-status').textContent =
     "JPG, PNG, WEBP or GIF — up to 5MB. Leave blank to use the emoji icon instead.";
   document.getElementById('pf-express').checked = false;
+  updateStockPreview();
   document.getElementById('pf-gallery-thumbs').innerHTML = "";
   document.getElementById('pf-gallery-file').value = "";
   document.getElementById('pf-gallery-status').textContent = "Select one or more photos — they upload and attach right away.";
@@ -744,7 +756,8 @@ function openProductModal(id){
       document.getElementById('pf-price').value = p.price ?? "";
       document.getElementById('pf-old_price').value = p.old_price ?? "";
       document.getElementById('pf-discount').value = p.discount ?? 0;
-      document.getElementById('pf-stock').value = p.stock || "in";
+      document.getElementById('pf-stock-qty').value = p.stock_qty ?? 0;
+      updateStockPreview();
       document.getElementById('pf-rating').value = p.rating ?? 4.5;
       document.getElementById('pf-reviews').value = p.reviews ?? "0";
       document.getElementById('pf-express').checked = !!p.express_delivery;
@@ -889,7 +902,7 @@ document.getElementById('product-form').addEventListener('submit', async (e) => 
       price: parseInt(price, 10),
       old_price: document.getElementById('pf-old_price').value === "" ? null : parseInt(document.getElementById('pf-old_price').value, 10),
       discount: parseInt(document.getElementById('pf-discount').value || 0, 10),
-      stock: document.getElementById('pf-stock').value,
+      stock_qty: parseInt(document.getElementById('pf-stock-qty').value || 0, 10),
       rating: parseFloat(document.getElementById('pf-rating').value || 4.5),
       reviews: document.getElementById('pf-reviews').value.trim() || "0",
       image_url: imageUrl,
