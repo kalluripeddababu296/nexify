@@ -78,7 +78,10 @@ app = Flask(__name__)
 
 CORS(
     app,
-    origins=["https://nexifyonline.netlify.app"],
+    origins=[
+        "https://nexifyonline.netlify.app",
+        "https://nexifyonline.vercel.app",
+    ],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
