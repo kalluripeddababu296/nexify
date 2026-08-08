@@ -747,7 +747,11 @@
 
 <div class="toast" id="toast">✅ Added to cart</div>
 
-<script src="config.js"></script>
+<script>
+// Backend URL — set directly here so this file works standalone on any host
+// (Vercel, Netlify, etc.) without needing a separate config.js.
+const API_BASE = "https://nexify-mjff.onrender.com";
+</script>
 <script>
 /* ==========================================================================
    NEXIFY FRONTEND
@@ -769,8 +773,6 @@
    submission falls back to an in-memory "pending orders" queue so the UI is
    fully testable standalone.
    ========================================================================== */
-
-// API_BASE now comes from config.js (shared with admin.html)
 
 // Fallback data — used only if the live backend can't be reached, so the
 // storefront still looks/works fine standalone (e.g. before deployment).
