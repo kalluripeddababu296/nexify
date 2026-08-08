@@ -129,6 +129,54 @@ def get_all_galleries():
         return {}
     return {doc["_id"]: doc.get("images", []) for doc in gallery_col.find({})}
 
+
+# --------------------------------------------------------------------------
+# Stock — products carry a numeric stock_qty (pieces left). The "stock"
+# text column (in/low/out, used everywhere else in the app for badges) is
+# always derived from it, so the admin only ever has to manage one number.
+# --------------------------------------------------------------------------
+LOW_STOCK_THRESHOLD = 5
+
+
+def compute_stock_status(qty):
+    if qty is None or qty <= 0:
+        return "out"
+    if qty <= LOW_STOCK_THRESHOLD:
+        return "low"
+    return "in"
+
+
+def reserve_stock(items):
+    """Atomically decrements stock_qty for every item in an order via the
+    decrement_stock() Postgres function (see schema.sql), so two customers
+    can't both "win" the last piece of something. If any item doesn't have
+    enough left, everything already reserved for this order is put back and
+    (error_message, failed_item) is returned; on success returns (None, None).
+    """
+    reserved = []
+    for item in items:
+        product_id = item.get("id")
+        try:
+            qty = int(item.get("qty") or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        if not product_id or qty <= 0:
+            continue
+
+        res = supabase.rpc("decrement_stock", {"p_id": product_id, "p_qty": qty}).execute()
+        new_qty = res.data
+        if new_qty is None:
+            # Not enough stock left for this item — undo everything reserved so far.
+            for r_id, r_qty in reserved:
+                try:
+                    supabase.rpc("increment_stock", {"p_id": r_id, "p_qty": r_qty}).execute()
+                except Exception:
+                    pass
+            label = item.get("name") or product_id
+            return f"'{label}' doesn't have enough stock left", item
+        reserved.append((product_id, qty))
+    return None, None
+
 # --------------------------------------------------------------------------
 # Product image storage — uses a public Supabase Storage bucket so the admin
 # dashboard can upload a photo and get back a URL to save on the product.
@@ -274,6 +322,10 @@ def create_order():
     if payment_method == "upi" and not utr_number:
         return jsonify({"error": "utr_number is required for UPI orders"}), 400
 
+    stock_error, _bad_item = reserve_stock(items)
+    if stock_error:
+        return jsonify({"error": stock_error}), 409
+
     order_ref = "NEX-" + uuid.uuid4().hex[:8].upper()
     row = {
         "order_ref": order_ref,
@@ -288,7 +340,23 @@ def create_order():
         "payment_status": "pending_verification" if payment_method == "upi" else "not_required",
         "utr_number": utr_number or None,
     }
-    supabase.table("orders").insert(row).execute()
+    try:
+        supabase.table("orders").insert(row).execute()
+    except Exception as e:
+        # Order failed to save after stock was already reserved — put it back.
+        for item in items:
+            product_id = item.get("id")
+            try:
+                qty = int(item.get("qty") or 1)
+            except (TypeError, ValueError):
+                qty = 1
+            if product_id and qty > 0:
+                try:
+                    supabase.rpc("increment_stock", {"p_id": product_id, "p_qty": qty}).execute()
+                except Exception:
+                    pass
+        return jsonify({"error": f"could not save order: {e}"}), 500
+
     notify_admin_new_order(row)
     return jsonify({"orderId": order_ref}), 201
 
@@ -590,9 +658,12 @@ def admin_create_product():
     if price < 0:
         return jsonify({"error": "price cannot be negative"}), 400
 
-    stock = body.get("stock", "in")
-    if stock not in ("in", "low", "out"):
-        return jsonify({"error": "invalid stock value"}), 400
+    try:
+        stock_qty = int(body.get("stock_qty", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid stock_qty"}), 400
+    if stock_qty < 0:
+        return jsonify({"error": "stock_qty cannot be negative"}), 400
 
     row = {
         "id": body.get("id") or ("p" + uuid.uuid4().hex[:8]),
@@ -605,7 +676,8 @@ def admin_create_product():
         "discount": int(body.get("discount") or 0),
         "rating": float(body.get("rating") or 4.5),
         "reviews": str(body.get("reviews") or "0"),
-        "stock": stock,
+        "stock_qty": stock_qty,
+        "stock": compute_stock_status(stock_qty),
         "category": body.get("category") or "General",
         "express_delivery": bool(body.get("express_delivery", False)),
     }
@@ -630,7 +702,15 @@ def admin_update_product(product_id):
         body["discount"] = int(body["discount"] or 0)
     if "rating" in body:
         body["rating"] = float(body["rating"] or 0)
-    if "stock" in body and body["stock"] not in ("in", "low", "out"):
+    if "stock_qty" in body:
+        try:
+            body["stock_qty"] = int(body["stock_qty"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid stock_qty"}), 400
+        if body["stock_qty"] < 0:
+            return jsonify({"error": "stock_qty cannot be negative"}), 400
+        body["stock"] = compute_stock_status(body["stock_qty"])
+    elif "stock" in body and body["stock"] not in ("in", "low", "out"):
         return jsonify({"error": "invalid stock value"}), 400
     if "express_delivery" in body:
         body["express_delivery"] = bool(body["express_delivery"])
