@@ -1309,9 +1309,9 @@ function renderQuickView(p){
         ${p.express ? `<div class="qv-express-tag">⚡ 30-Minute Delivery</div>` : ''}
         ${!disabled ? `
         <div class="qv-qty">
-          <button onclick="changeQvQty(-1)">−</button>
+          <button onclick="changeQvQty(-1, '${p.id}')">−</button>
           <span class="qn" id="qv-qty-val">${qvQty}</span>
-          <button onclick="changeQvQty(1)">+</button>
+          <button onclick="changeQvQty(1, '${p.id}')">+</button>
         </div>` : `<div style="height:16px;"></div>`}
         <div class="btn-row">
           <button class="btn btn-cart" onclick="addToCart('${p.id}', qvQty); closeQuickView();" ${disabled?'disabled':''}>Add to Cart</button>
@@ -1335,8 +1335,16 @@ function setQvMainImage(i){
   });
 }
 
-function changeQvQty(delta){
-  qvQty = Math.max(1, qvQty + delta);
+function changeQvQty(delta, id){
+  const p = id ? findProduct(id) : null;
+  const maxAllowed = (p && p.stockQty != null) ? p.stockQty : Infinity;
+  const next = Math.max(1, qvQty + delta);
+  if(next > maxAllowed){
+    qvQty = maxAllowed;
+    showToast(`Only ${maxAllowed} left in stock`);
+  } else {
+    qvQty = next;
+  }
   document.getElementById('qv-qty-val').textContent = qvQty;
 }
 
@@ -1344,7 +1352,13 @@ function quickViewBuyNow(id){
   closeQuickView();
   const p = findProduct(id);
   if(!p || p.stock === "out") return;
-  buyNowProduct = { id, qty: qvQty };
+  const maxAllowed = p.stockQty != null ? p.stockQty : Infinity;
+  const qty = Math.min(qvQty, maxAllowed);
+  if(qty < 1) return;
+  if(qty < qvQty){
+    showToast(`Only ${maxAllowed} left — buying the max available`);
+  }
+  buyNowProduct = { id, qty };
   renderModalForm();
   document.getElementById('modal-overlay').classList.add('show');
 }
