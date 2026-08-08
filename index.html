@@ -830,6 +830,7 @@ function normalizeProduct(row){
     rating: Number(row.rating || 4.5),
     reviews: String(row.reviews ?? "0"),
     stock: row.stock || "in",
+    stockQty: row.stock_qty != null ? Number(row.stock_qty) : null,
     category: row.category || "General",
     image: row.image_url || row.image || null,
     gallery: Array.isArray(row.gallery_images) ? row.gallery_images.filter(Boolean) : [],
@@ -1131,14 +1132,36 @@ document.getElementById('sort-select').addEventListener('change', (e) => {
 function addToCart(id, qty=1){
   const p = findProduct(id);
   if(!p || p.stock === "out") return;
-  cart[id] = (cart[id] || 0) + qty;
+  const current = cart[id] || 0;
+  const maxAllowed = p.stockQty != null ? p.stockQty : Infinity;
+
+  if(current >= maxAllowed){
+    showToast(`Only ${maxAllowed} left in stock — you already have that many in your cart`);
+    return;
+  }
+
+  const next = Math.min(current + qty, maxAllowed);
+  cart[id] = next;
   renderCart();
-  showToast(`✅ ${p.name} added to cart`);
+  if(next < current + qty){
+    showToast(`Only ${maxAllowed} left — added the max available`);
+  } else {
+    showToast(`✅ ${p.name} added to cart`);
+  }
 }
 
 function changeQty(id, delta){
   if(!cart[id]) return;
-  cart[id] += delta;
+  const p = findProduct(id);
+  const maxAllowed = (p && p.stockQty != null) ? p.stockQty : Infinity;
+  const next = cart[id] + delta;
+
+  if(delta > 0 && next > maxAllowed){
+    showToast(`Only ${maxAllowed} left in stock`);
+    return;
+  }
+
+  cart[id] = next;
   if(cart[id] <= 0) delete cart[id];
   renderCart();
 }
@@ -1428,6 +1451,7 @@ function renderModalForm(){
       </div>
       ${paymentSectionHTML}
       <div class="order-total-row"><span>Order Total</span><span>₹${money(total)}</span></div>
+      <div id="order-submit-error" style="display:none; background:#FEECEC; color:#B3261E; border:1px solid #F4C7C3; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:10px;"></div>
       <button type="submit" class="btn-place" id="place-order-btn">Place Order</button>
       <div class="modal-note">${upiAvailable ? 'Cash on Delivery or UPI' : 'Cash on Delivery • Pay online coming soon'}</div>
     </form>
@@ -1484,8 +1508,22 @@ async function handleOrderSubmit(e){
   const btn = document.getElementById('place-order-btn');
   btn.disabled = true;
   btn.textContent = "Placing order...";
+  const errBox = document.getElementById('order-submit-error');
+  errBox.style.display = "none";
 
-  const orderId = await submitOrder(order);
+  let orderId;
+  try{
+    orderId = await submitOrder(order);
+  } catch(err){
+    // The backend actively rejected the order (e.g. not enough stock left) —
+    // show the real reason instead of pretending it went through.
+    errBox.textContent = err.message || "Couldn't place your order. Please try again.";
+    errBox.style.display = "block";
+    btn.disabled = false;
+    btn.textContent = "Place Order";
+    return;
+  }
+
   addOrderToHistory(order, orderId);
 
   // clear state
@@ -1496,23 +1534,38 @@ async function handleOrderSubmit(e){
 }
 
 async function submitOrder(order){
-  // Tries the real backend first; falls back to a local demo queue so the
-  // page still works before the Python backend is connected.
-  try {
-    if(API_BASE){
-      const res = await fetch(`${API_BASE}/api/orders`, {
+  // Tries the real backend first; only falls back to a local demo queue if
+  // the backend can't be reached at all (e.g. testing before it's deployed).
+  // If the backend responds but rejects the order (e.g. out of stock), that
+  // error is thrown so the customer sees the real reason — it must NOT be
+  // treated the same as "offline" or the order would silently vanish.
+  if(API_BASE){
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(order)
       });
-      if(res.ok){
-        const data = await res.json();
-        return data.orderId || data.id || "ORD-" + Date.now();
-      }
+    } catch(networkErr){
+      console.warn("Backend not reachable, storing order locally.", networkErr);
+      return queueDemoOrder(order);
     }
-  } catch(err){
-    console.warn("Backend not reachable yet, storing order locally.", err);
+
+    if(res.ok){
+      const data = await res.json();
+      return data.orderId || data.id || "ORD-" + Date.now();
+    }
+
+    // Backend responded but declined the order — surface the real reason.
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "Couldn't place your order. Please try again.");
   }
+
+  return queueDemoOrder(order);
+}
+
+function queueDemoOrder(order){
   window._pendingOrders = window._pendingOrders || [];
   const localId = "DEMO-" + Date.now().toString().slice(-6);
   window._pendingOrders.push({ ...order, orderId: localId });
